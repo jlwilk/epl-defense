@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "epl-defense"
+version = "0.1.0"
+description = "English Premier League stats app with aggressive caching for API-Football v3"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Your Name" }]
+dependencies = [
+  "requests>=2.31",
+  "requests-cache>=1.2",
+  "typer>=0.12",
+  "rich>=13.7",
+  "python-dotenv>=1.0",
+  "pydantic>=2.7",
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.30",
+  "SQLAlchemy>=2.0",
+  "alembic>=1.13",
+  "httpx>=0.27",
+  "psycopg2-binary>=2.9",
+  "APScheduler>=3.10"
+]
+
+[project.scripts]
+epl = "epl_defense.cli:main"
+epl-api = "epl_defense.server:run"
+epl-fastapi = "app.main:run"
+
+[tool.setuptools]
+packages = { find = { where = ["."], include = ["epl_defense*", "app*"] } }
+
+
+
+
