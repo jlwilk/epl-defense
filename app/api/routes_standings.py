@@ -12,14 +12,15 @@ router = APIRouter(prefix="/standings", tags=["standings"])
 
 @router.get("/")
 def get_standings(
-    season: int = Query(..., description="Season year, e.g. 2024"),
+    season: int = Query(None, description="Season year, e.g. 2025 (defaults to 2025)"),
     league: int = Query(None, description="League id; defaults to settings.LEAGUE_ID"),
 ) -> Dict[str, Any]:
     settings = get_settings()
     league_id = league or settings.league_id_default
+    season_id = season or settings.season_default
     try:
         client = ApiClientV3()
-        data = client.get("/standings", params={"season": season, "league": league_id})
+        data = client.get("/standings", params={"season": season_id, "league": league_id})
         return data
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))

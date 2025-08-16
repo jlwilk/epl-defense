@@ -1,19 +1,18 @@
-# EPL Defense - FastAPI Backend
+# EPL Defense API 🏆⚽
 
-English Premier League stats API using API-Football v3 with FastAPI, SQLAlchemy, and comprehensive caching.
+A comprehensive English Premier League statistics and data API built with FastAPI, featuring intelligent data ingestion and caching from API-Football v3.
 
-**API Documentation**: [API-Football v3](https://www.api-football.com/documentation-v3)
+## ✨ Features
 
-## Features
+- **🏗️ Complete Data Model**: Comprehensive database schema for leagues, teams, players, fixtures, and statistics
+- **📥 Smart Data Ingestion**: Bulk import teams and players with pagination handling and rate limiting
+- **🔄 Background Processing**: Asynchronous data ingestion with progress tracking
+- **⚡ Fast Responses**: Local database queries instead of external API calls
+- **🔄 2025 Season Ready**: Defaults to current EPL season with easy override
+- **📊 Rich Statistics**: Player stats, team performance, fixture details, and more
+- **🔒 Rate Limit Aware**: Intelligent pagination and API call management
 
-- 🚀 **FastAPI backend** with automatic OpenAPI documentation
-- 🗄️ **SQLAlchemy 2.0** with Alembic migrations (ready for Postgres)
-- 🔑 **Dual API key support**: Direct API-Football or RapidAPI
-- 📊 **EPL endpoints**: standings, teams, fixtures, defense stats
-- 🐳 **Docker ready** with docker-compose for local development
-- 📝 **Type hints** throughout with Pydantic schemas
-
-## Quick Start
+## 🚀 Quick Start
 
 ### 1. Setup Environment
 
@@ -21,166 +20,260 @@ English Premier League stats API using API-Football v3 with FastAPI, SQLAlchemy,
 # Clone and setup
 git clone <your-repo>
 cd epl-defense
-
-# Create virtual environment
-python3 -m venv .venv
+python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
 pip install -e .
-```
 
-### 2. Configure API Keys
-
-Copy the example environment file and configure your API key:
-
-```bash
+# Copy environment file
 cp env.sample .env
-# Edit .env and set either:
-# Option A - Direct API-Football key:
-APIFOOTBALL_API_KEY=your_direct_key_here
-APIFOOTBALL_BASE_URL=https://v3.football.api-sports.io
-
-# Option B - RapidAPI key (recommended):
-RAPIDAPI_KEY=your_rapidapi_key_here
-APIFOOTBALL_BASE_URL=https://api-football-v1.p.rapidapi.com/v3
+# Edit .env with your API keys
 ```
 
-### 3. Start the API Server
+### 2. Initialize Database
 
 ```bash
-# Start FastAPI server
-epl-fastapi
-
-# Or run directly
-python -m app.main
-
-# Server runs on http://127.0.0.1:8001
+# Create all database tables
+python init_database.py
 ```
 
-### 4. Explore the API
+### 3. Start FastAPI Server
 
-- **Interactive docs**: http://127.0.0.1:8001/docs
-- **ReDoc**: http://127.0.0.1:8001/redoc
-- **Health check**: http://127.0.0.1:8001/health
+```bash
+# Development server with hot reload
+uvicorn app.main:create_app --reload --host 127.0.0.1 --port 8001
 
-## API Endpoints
+# Or use the dev script
+epl-fastapi
+```
 
-### Core Endpoints
+### 4. Ingest EPL Data
+
+```bash
+# Start ingesting all EPL 2025 data
+curl -X POST 'http://127.0.0.1:8001/ingestion/epl/2025'
+
+# Check ingestion status
+curl 'http://127.0.0.1:8001/ingestion/status/39/2025'
+```
+
+## 🗄️ Database Schema
+
+### Core Entities
+
+- **League**: League information, seasons, coverage
+- **Team**: Team details, venues, league membership
+- **Player**: Player profiles, statistics, team membership
+- **Fixture**: Match details, scores, status
+- **FixtureEvent**: Goals, cards, substitutions
+- **FixtureLineup**: Team formations, player positions
+- **FixtureStatistics**: Match statistics, possession, shots
+
+### Relationships
+
+```
+League (1) ←→ (N) Team
+Team (1) ←→ (N) Player
+Team (1) ←→ (1) Venue
+League (1) ←→ (N) Fixture
+Fixture (1) ←→ (N) FixtureEvent
+Fixture (1) ←→ (N) FixtureLineup
+Fixture (1) ←→ (N) FixtureStatistics
+```
+
+## 📡 API Endpoints
+
+### Data Ingestion
 
 | Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | API health status |
-| `/leagues` | GET | List all leagues |
-| `/teams` | GET | Teams by season/league |
-| `/standings` | GET | League standings |
-| `/fixtures` | GET | Match fixtures |
-| `/defense/table` | GET | Goals conceded per team |
+|-----------|---------|-------------|
+| `/ingestion/epl/2025` | POST | Start EPL 2025 data ingestion |
+| `/ingestion/league/{id}/season/{year}` | POST | Ingest specific league/season |
+| `/ingestion/status/{id}/{year}` | GET | Check ingestion progress |
 
-### Example Requests
+### Teams & Players
+
+| Endpoint | Method | Description |
+|-----------|---------|-------------|
+| `/teams/` | GET | List all teams (defaults to 2025) |
+| `/teams/{id}` | GET | Team details |
+| `/teams/{id}/players` | GET | Team roster |
+| `/teams/{id}/statistics` | GET | Team performance stats |
+
+### Fixtures & Matches
+
+| Endpoint | Method | Description |
+|-----------|---------|-------------|
+| `/fixtures/` | GET | All fixtures (defaults to 2025) |
+| `/fixtures/live` | GET | Live matches |
+| `/fixtures/{id}` | GET | Match details |
+| `/fixtures/{id}/events` | GET | Match events (goals, cards) |
+| `/fixtures/{id}/lineups` | GET | Team formations |
+
+### Statistics & Analysis
+
+| Endpoint | Method | Description |
+|-----------|---------|-------------|
+| `/standings/` | GET | League table (defaults to 2025) |
+| `/defense/table` | GET | Defensive performance ranking |
+| `/team-stats/overview` | GET | Team statistics overview |
+
+## 🔧 Configuration
+
+### Environment Variables
 
 ```bash
-# Get EPL 2024 standings
-curl 'http://127.0.0.1:8001/standings/?season=2024'
+# API Keys (choose one)
+APIFOOTBALL_API_KEY=your_direct_api_key
+RAPIDAPI_KEY=your_rapidapi_key
 
-# Get teams in EPL 2024
-curl 'http://127.0.0.1:8001/teams/?season=2024'
+# League & Season Defaults
+LEAGUE_ID=39          # EPL
+SEASON_DEFAULT=2025   # Current season
 
-# Get recent fixtures
-curl 'http://127.0.0.1:8001/fixtures/?season=2024&last=10'
+# Database
+DATABASE_URL=epl_defense.db  # SQLite file
 
-# Get defense table (goals conceded)
-curl 'http://127.0.0.1:8001/defense/table?season=2024'
+# Ingestion Settings
+INGESTION_BATCH_SIZE=100
+INGESTION_RATE_LIMIT_DELAY=1.0
 ```
 
-## Project Structure
+## 🏃‍♂️ Development
+
+### Project Structure
 
 ```
 epl-defense/
-├── app/                    # FastAPI application
-│   ├── api/              # API route handlers
-│   │   ├── routes_*.py   # Endpoint definitions
-│   ├── config.py         # Configuration management
+├── app/
+│   ├── api/              # API routes
 │   ├── db/               # Database setup
-│   ├── main.py           # FastAPI app factory
 │   ├── models/           # SQLAlchemy models
 │   ├── schemas/          # Pydantic schemas
 │   └── services/         # Business logic
 ├── epl_defense/          # Legacy CLI (deprecated)
-├── alembic/              # Database migrations
-├── docker-compose.yml    # Local development
-├── pyproject.toml        # Python packaging
+├── init_database.py      # Database initialization
+├── pyproject.toml        # Dependencies
 └── README.md
 ```
-
-## Development
 
 ### Database Setup
 
 ```bash
-# Initialize Alembic (when ready for DB)
-alembic init alembic
-alembic revision --autogenerate -m "Initial migration"
-alembic upgrade head
+# Initialize tables
+python init_database.py
+
+# Reset database (⚠️ destructive)
+python -c "from app.db.init_db import drop_db; drop_db()"
 ```
 
-### Docker Development
+### Adding New Models
+
+1. Create model in `app/models/`
+2. Add to `app/models/__init__.py`
+3. Update `app/db/init_db.py`
+4. Run `python init_database.py`
+
+## 📊 Data Ingestion
+
+### How It Works
+
+1. **League Setup**: Creates league record with season info
+2. **Team Import**: Bulk imports all teams and venues
+3. **Player Import**: Handles pagination, imports all players with stats
+4. **Fixture Import**: Imports match schedule and results
+5. **Smart Updates**: Only updates changed data, preserves history
+
+### Rate Limiting
+
+- **Teams**: Single API call (20 teams)
+- **Players**: Paginated calls with 1-second delays
+- **Fixtures**: Single API call (380+ matches)
+- **Total API calls**: ~40-50 calls per full ingestion
+
+### Monitoring
 
 ```bash
-# Start Postgres and Redis
-docker-compose up -d
+# Check ingestion status
+curl 'http://127.0.0.1:8001/ingestion/status/39/2025'
 
-# Set DATABASE_URL in .env
-DATABASE_URL=postgresql://user:pass@localhost:5432/epl_defense
+# Response example:
+{
+  "league_id": 39,
+  "season": 2025,
+  "has_league": true,
+  "teams_count": 20,
+  "players_count": 550,
+  "fixtures_count": 380,
+  "last_updated": "2025-01-14T11:00:00Z"
+}
 ```
 
-### Testing
+## 🚀 Production Deployment
 
-```bash
-# Run tests (when added)
-pytest
+### Docker Setup (Coming Soon)
 
-# Run with coverage
-pytest --cov=app
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/epl
+    depends_on:
+      - db
+      - redis
+  
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=epl
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+  
+  redis:
+    image: redis:7-alpine
 ```
 
-## Configuration
+### Scheduled Ingestion
 
-### Environment Variables
+```python
+# Background job setup (coming soon)
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `APIFOOTBALL_API_KEY` | - | Direct API-Football key |
-| `RAPIDAPI_KEY` | - | RapidAPI key (alternative) |
-| `APIFOOTBALL_BASE_URL` | `https://v3.football.api-sports.io` | API base URL |
-| `DATABASE_URL` | `sqlite:///./epl.db` | Database connection |
-| `HOST` | `127.0.0.1` | Server host |
-| `PORT` | `8001` | Server port |
-| `DEBUG` | `false` | Debug mode |
+scheduler = AsyncIOScheduler()
+scheduler.add_job(
+    ingest_epl_data,
+    'interval',
+    hours=6,  # Update every 6 hours
+    args=[39, 2025]
+)
+scheduler.start()
+```
 
-## API Rate Limits
-
-- **Direct API-Football**: 7500 requests/day (Pro plan)
-- **RapidAPI**: Varies by plan
-- **Local caching**: Implemented to minimize API calls
-
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+2. Create feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass
+5. Submit pull request
 
-## License
+## 📝 License
 
-[Your License Here]
+MIT License - see LICENSE file for details.
 
-## Support
+## 🙏 Acknowledgments
 
-- **API Documentation**: [API-Football v3](https://www.api-football.com/documentation-v3)
-- **FastAPI Docs**: https://fastapi.tiangolo.com/
-- **SQLAlchemy Docs**: https://docs.sqlalchemy.org/
+- [API-Football](https://www.api-football.com/) for comprehensive football data
+- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
+- [SQLAlchemy](https://www.sqlalchemy.org/) for robust ORM capabilities
+
+---
+
+**⚽ Ready to build the ultimate EPL analytics platform! 🚀**
 
 
 

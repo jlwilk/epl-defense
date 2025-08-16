@@ -33,6 +33,9 @@ epl-fastapi = "app.main:run"
 [tool.setuptools]
 packages = { find = { where = ["."], include = ["epl_defense*", "app*"] } }
 
+[tool.setuptools.scripts]
+dev = "uvicorn app.main:create_app --reload --host 127.0.0.1 --port 8001"
+
 
 
 
