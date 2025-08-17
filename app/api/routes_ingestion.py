@@ -46,7 +46,7 @@ async def get_ingestion_status(
     """Get the current ingestion status for a league/season."""
     try:
         ingestion_service = DataIngestionService()
-        status = await ingestion_service.get_ingestion_status(league_id, season)
+        status = ingestion_service.get_ingestion_status(league_id, season)
         
         return status
         

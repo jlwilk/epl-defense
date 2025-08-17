@@ -11,6 +11,9 @@ A comprehensive English Premier League statistics and data API built with FastAP
 - **🔄 2025 Season Ready**: Defaults to current EPL season with easy override
 - **📊 Rich Statistics**: Player stats, team performance, fixture details, and more
 - **🔒 Rate Limit Aware**: Intelligent pagination and API call management
+- **🎯 Comprehensive Player Stats**: Individual, team, and league-wide player performance metrics
+- **⚽ Fixture Player Stats**: Detailed match-by-match player performance data
+- **🏆 Leaderboards**: Top scorers, assist providers, and defensive leaders
 
 ## 🚀 Quick Start
 
@@ -40,7 +43,7 @@ python init_database.py
 
 ```bash
 # Development server with hot reload
-uvicorn app.main:create_app --reload --host 127.0.0.1 --port 8001
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 # Or use the dev script
 epl-fastapi
@@ -50,10 +53,10 @@ epl-fastapi
 
 ```bash
 # Start ingesting all EPL 2025 data
-curl -X POST 'http://127.0.0.1:8001/ingestion/epl/2025'
+curl -X POST 'http://127.0.0.1:8000/ingestion/epl/2025'
 
 # Check ingestion status
-curl 'http://127.0.0.1:8001/ingestion/status/39/2025'
+curl 'http://127.0.0.1:8000/ingestion/status/39/2025'
 ```
 
 ## 🗄️ Database Schema
@@ -67,6 +70,7 @@ curl 'http://127.0.0.1:8001/ingestion/status/39/2025'
 - **FixtureEvent**: Goals, cards, substitutions
 - **FixtureLineup**: Team formations, player positions
 - **FixtureStatistics**: Match statistics, possession, shots
+- **FixturePlayerStats**: Individual player performance in specific matches
 
 ### Relationships
 
@@ -78,6 +82,7 @@ League (1) ←→ (N) Fixture
 Fixture (1) ←→ (N) FixtureEvent
 Fixture (1) ←→ (N) FixtureLineup
 Fixture (1) ←→ (N) FixtureStatistics
+Fixture (1) ←→ (N) FixturePlayerStats
 ```
 
 ## 📡 API Endpoints
@@ -98,6 +103,8 @@ Fixture (1) ←→ (N) FixtureStatistics
 | `/teams/{id}` | GET | Team details |
 | `/teams/{id}/players` | GET | Team roster |
 | `/teams/{id}/statistics` | GET | Team performance stats |
+| `/teams/{id}/fixtures` | GET | Team fixtures |
+| `/teams/search` | GET | Search teams by name |
 
 ### Fixtures & Matches
 
@@ -105,9 +112,23 @@ Fixture (1) ←→ (N) FixtureStatistics
 |-----------|---------|-------------|
 | `/fixtures/` | GET | All fixtures (defaults to 2025) |
 | `/fixtures/live` | GET | Live matches |
-| `/fixtures/{id}` | GET | Match details |
-| `/fixtures/{id}/events` | GET | Match events (goals, cards) |
-| `/fixtures/{id}/lineups` | GET | Team formations |
+| `/fixtures/head-to-head` | GET | Head-to-head fixtures between teams |
+| `/fixtures/{id}/players` | GET | Live player stats from API-Football |
+| `/fixtures/{id}/players/stored` | GET | Stored fixture player statistics |
+
+### Player Statistics (NEW! 🎯)
+
+| Endpoint | Method | Description |
+|-----------|---------|-------------|
+| `/player-stats/player/{id}` | GET | Individual player season statistics |
+| `/player-stats/team/{id}` | GET | All player stats for a team |
+| `/player-stats/league/{id}` | GET | All player stats for a league |
+| `/player-stats/top-scorers` | GET | Top goal scorers leaderboard |
+| `/player-stats/top-assists` | GET | Top assist providers leaderboard |
+| `/player-stats/defensive-leaders` | GET | Top defensive players by metric |
+| `/player-stats/search` | GET | Search players by name |
+| `/player-stats/countries` | GET | Available player countries |
+| `/player-stats/player/{id}/seasons` | GET | All seasons for a player |
 
 ### Statistics & Analysis
 
@@ -116,6 +137,36 @@ Fixture (1) ←→ (N) FixtureStatistics
 | `/standings/` | GET | League table (defaults to 2025) |
 | `/defense/table` | GET | Defensive performance ranking |
 | `/team-stats/overview` | GET | Team statistics overview |
+| `/team-stats/goals` | GET | Team goal statistics |
+| `/team-stats/fixtures` | GET | Team fixture statistics |
+| `/team-stats/cards` | GET | Team card statistics |
+| `/team-stats/lineups` | GET | Team lineup statistics |
+
+## 📊 Data Coverage
+
+### Player Performance Metrics
+
+- **Basic Info**: Age, nationality, height, weight, position, number
+- **Performance**: Appearances, lineups, minutes played, rating
+- **Goals & Assists**: Goals scored, assists provided, penalty stats
+- **Shots & Passing**: Total shots, shots on target, passes, accuracy, key passes
+- **Defensive**: Tackles, blocks, interceptions, duels won
+- **Attacking**: Dribbles, fouls drawn/committed, cards
+- **Goalkeeper**: Saves, goals conceded, clean sheets
+
+### Fixture Player Statistics
+
+- **Match Performance**: Individual player stats for each fixture
+- **Real-time Data**: Live statistics from API-Football
+- **Stored Data**: Historical fixture player performance
+- **Comprehensive Metrics**: All performance indicators per match
+
+### Team & League Analysis
+
+- **Team Performance**: Goals, fixtures, cards, lineups, statistics
+- **League Standings**: Points, rankings, defensive metrics
+- **Head-to-Head**: Team comparison and historical matchups
+- **Live Updates**: Real-time match data and statistics
 
 ## 🔧 Configuration
 
@@ -146,11 +197,18 @@ INGESTION_RATE_LIMIT_DELAY=1.0
 epl-defense/
 ├── app/
 │   ├── api/              # API routes
+│   │   ├── routes_leagues.py
+│   │   ├── routes_teams.py
+│   │   ├── routes_standings.py
+│   │   ├── routes_fixtures.py
+│   │   ├── routes_defense.py
+│   │   ├── routes_team_stats.py
+│   │   ├── routes_player_stats.py    # NEW!
+│   │   └── routes_ingestion.py
 │   ├── db/               # Database setup
 │   ├── models/           # SQLAlchemy models
 │   ├── schemas/          # Pydantic schemas
 │   └── services/         # Business logic
-├── epl_defense/          # Legacy CLI (deprecated)
 ├── init_database.py      # Database initialization
 ├── pyproject.toml        # Dependencies
 └── README.md
@@ -181,20 +239,22 @@ python -c "from app.db.init_db import drop_db; drop_db()"
 2. **Team Import**: Bulk imports all teams and venues
 3. **Player Import**: Handles pagination, imports all players with stats
 4. **Fixture Import**: Imports match schedule and results
-5. **Smart Updates**: Only updates changed data, preserves history
+5. **Fixture Player Stats**: Imports individual player performance data
+6. **Smart Updates**: Only updates changed data, preserves history
 
 ### Rate Limiting
 
 - **Teams**: Single API call (20 teams)
 - **Players**: Paginated calls with 1-second delays
 - **Fixtures**: Single API call (380+ matches)
-- **Total API calls**: ~40-50 calls per full ingestion
+- **Fixture Player Stats**: Individual fixture calls with rate limiting
+- **Total API calls**: ~400-500 calls per full ingestion
 
 ### Monitoring
 
 ```bash
 # Check ingestion status
-curl 'http://127.0.0.1:8001/ingestion/status/39/2025'
+curl 'http://127.0.0.1:8000/ingestion/status/39/2025'
 
 # Response example:
 {
@@ -204,6 +264,7 @@ curl 'http://127.0.0.1:8001/ingestion/status/39/2025'
   "teams_count": 20,
   "players_count": 550,
   "fixtures_count": 380,
+  "player_stats_count": 240,
   "last_updated": "2025-01-14T11:00:00Z"
 }
 ```
@@ -253,6 +314,28 @@ scheduler.add_job(
 scheduler.start()
 ```
 
+## 🎯 Use Cases
+
+### Fantasy Football Applications
+- Complete player performance data
+- Season-long and match-by-match statistics
+- Player rankings and leaderboards
+
+### Sports Analytics Platforms
+- Deep statistical analysis and comparisons
+- Team performance tracking
+- Player scouting and evaluation
+
+### Fan Engagement Apps
+- Player rankings and leaderboards
+- Team analysis and statistics
+- Match performance insights
+
+### Data Journalism
+- Comprehensive EPL statistics
+- Historical performance data
+- Real-time match updates
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -274,6 +357,8 @@ MIT License - see LICENSE file for details.
 ---
 
 **⚽ Ready to build the ultimate EPL analytics platform! 🚀**
+
+**🎯 Now with comprehensive player statistics, fixture analysis, and leaderboards!**
 
 
 

@@ -11,6 +11,7 @@ from app.api.routes_fixtures import router as fixtures_router
 from app.api.routes_defense import router as defense_router
 from app.api.routes_team_stats import router as team_stats_router
 from app.api.routes_ingestion import router as ingestion_router
+from app.api.routes_player_stats import router as player_stats_router
 
 
 def create_app() -> FastAPI:
@@ -37,12 +38,16 @@ def create_app() -> FastAPI:
     app.include_router(defense_router)
     app.include_router(team_stats_router)
     app.include_router(ingestion_router)
+    app.include_router(player_stats_router)
 
     @app.get("/health")
-    async def health_check():
+    def health_check():
         return {"status": "ok"}
 
     return app
+
+
+app = create_app()
 
 
 def run() -> None:

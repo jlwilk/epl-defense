@@ -43,6 +43,7 @@ class Fixture(Base):
     events = relationship("FixtureEvent", back_populates="fixture")
     lineups = relationship("FixtureLineup", back_populates="fixture")
     statistics = relationship("FixtureStatistics", back_populates="fixture")
+    player_stats = relationship("FixturePlayerStats", back_populates="fixture")
 
 
 class FixtureEvent(Base):
@@ -116,3 +117,67 @@ class FixtureStatistics(Base):
     # Relationships
     fixture = relationship("Fixture", back_populates="statistics")
     team = relationship("Team")
+
+
+class FixturePlayerStats(Base):
+    """Individual player statistics for a specific fixture."""
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fixture_id: Mapped[int] = mapped_column(Integer, ForeignKey("fixture.id"), nullable=False)
+    team_id: Mapped[int] = mapped_column(Integer, ForeignKey("team.id"), nullable=False)
+    player_id: Mapped[int] = mapped_column(Integer, ForeignKey("player.id"), nullable=False)
+    season: Mapped[int] = mapped_column(Integer, nullable=False)
+    
+    # Basic match info
+    position: Mapped[str | None] = mapped_column(String(32))  # GK, DEF, MID, FWD
+    number: Mapped[int | None] = mapped_column(Integer)
+    is_starter: Mapped[bool] = mapped_column(Boolean, default=False)
+    minutes: Mapped[int | None] = mapped_column(Integer, default=0)
+    
+    # Goals and assists
+    goals: Mapped[int | None] = mapped_column(Integer, default=0)
+    assists: Mapped[int | None] = mapped_column(Integer, default=0)
+    penalty_goals: Mapped[int | None] = mapped_column(Integer, default=0)
+    penalty_missed: Mapped[int | None] = mapped_column(Integer, default=0)
+    
+    # Cards
+    yellow_cards: Mapped[int | None] = mapped_column(Integer, default=0)
+    red_cards: Mapped[int | None] = mapped_column(Integer, default=0)
+    
+    # Shots
+    shots_total: Mapped[int | None] = mapped_column(Integer, default=0)
+    shots_on_target: Mapped[int | None] = mapped_column(Integer, default=0)
+    
+    # Passes
+    passes_total: Mapped[int | None] = mapped_column(Integer, default=0)
+    passes_accuracy: Mapped[int | None] = mapped_column(Integer, default=0)
+    key_passes: Mapped[int | None] = mapped_column(Integer, default=0)
+    
+    # Other stats
+    fouls_committed: Mapped[int | None] = mapped_column(Integer, default=0)
+    fouls_drawn: Mapped[int | None] = mapped_column(Integer, default=0)
+    offsides: Mapped[int | None] = mapped_column(Integer, default=0)
+    tackles_total: Mapped[int | None] = mapped_column(Integer, default=0)
+    blocks_total: Mapped[int | None] = mapped_column(Integer, default=0)
+    interceptions_total: Mapped[int | None] = mapped_column(Integer, default=0)
+    duels_total: Mapped[int | None] = mapped_column(Integer, default=0)
+    duels_won: Mapped[int | None] = mapped_column(Integer, default=0)
+    
+    # Dribbles
+    dribbles_attempts: Mapped[int | None] = mapped_column(Integer, default=0)
+    dribbles_success: Mapped[int | None] = mapped_column(Integer, default=0)
+    
+    # Goalkeeper specific stats
+    saves: Mapped[int | None] = mapped_column(Integer, default=0)
+    goals_conceded: Mapped[int | None] = mapped_column(Integer, default=0)
+    clean_sheets: Mapped[int | None] = mapped_column(Integer, default=0)
+    
+    # Rating
+    rating: Mapped[str | None] = mapped_column(String(10))  # API rating (usually 1-10)
+    
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    fixture = relationship("Fixture", back_populates="player_stats")
+    team = relationship("Team")
+    player = relationship("Player")

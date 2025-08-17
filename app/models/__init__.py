@@ -2,7 +2,7 @@ from .base import Base
 from .league import League
 from .team import Team, Venue
 from .player import Player
-from .fixture import Fixture, FixtureEvent, FixtureLineup, FixtureLineupPlayer, FixtureStatistics
+from .fixture import Fixture, FixtureEvent, FixtureLineup, FixtureLineupPlayer, FixtureStatistics, FixturePlayerStats
 
 __all__ = [
     "Base",
@@ -14,5 +14,6 @@ __all__ = [
     "FixtureEvent", 
     "FixtureLineup",
     "FixtureLineupPlayer",
-    "FixtureStatistics"
+    "FixtureStatistics",
+    "FixturePlayerStats"
 ]

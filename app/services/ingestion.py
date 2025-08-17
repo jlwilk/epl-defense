@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.db.session import SessionLocal
-from app.models import League, Team, Venue, Player, Fixture
+from app.models import League, Team, Venue, Player, Fixture, FixturePlayerStats
 from app.services.api_client import ApiClientV3
 from app.config import get_settings
 
@@ -28,36 +28,33 @@ class DataIngestionService:
         """Get database session."""
         return SessionLocal()
     
-    async def ingest_league_data(self, league_id: int, season: int) -> Dict[str, Any]:
+    def ingest_league_data(self, league_id: int, season: int) -> Dict[str, Any]:
         """Ingest all data for a specific league and season."""
         logger.info(f"Starting ingestion for league {league_id}, season {season}")
         
         try:
-            # 1. Ingest league information
-            league_data = await self._ingest_league(league_id, season)
+            # Ingest league, teams, players, and fixtures
+            league_data = self._ingest_league(league_id, season)
+            teams_data = self._ingest_teams(league_id, season)
+            players_data = self._ingest_players(league_id, season)
+            fixtures_data = self._ingest_fixtures(league_id, season)
             
-            # 2. Ingest teams
-            teams_data = await self._ingest_teams(league_id, season)
-            
-            # 3. Ingest players (with pagination)
-            players_data = await self._ingest_players(league_id, season)
-            
-            # 4. Ingest fixtures
-            fixtures_data = await self._ingest_fixtures(league_id, season)
+            # Ingest fixture player statistics
+            player_stats_data = self._ingest_fixture_player_stats(league_id, season)
             
             return {
                 "league": league_data,
                 "teams": teams_data,
                 "players": players_data,
                 "fixtures": fixtures_data,
-                "ingestion_time": datetime.utcnow().isoformat()
+                "player_stats": player_stats_data
             }
             
         except Exception as e:
             logger.error(f"Error during ingestion: {e}")
             raise
     
-    async def _ingest_league(self, league_id: int, season: int) -> Dict[str, Any]:
+    def _ingest_league(self, league_id: int, season: int) -> Dict[str, Any]:
         """Ingest league information."""
         logger.info(f"Ingesting league {league_id} for season {season}")
         
@@ -91,7 +88,18 @@ class DataIngestionService:
                 logger.info(f"Updating existing league {league_id}")
                 for key, value in league_info.items():
                     if hasattr(existing_league, key):
-                        setattr(existing_league, key, value)
+                        # Handle special cases for nested objects
+                        if key == "country" and isinstance(value, dict):
+                            existing_league.country = value.get("name")
+                        elif key == "seasons" and isinstance(value, list) and len(value) > 0:
+                            season_info = value[0]
+                            existing_league.season_start = season_info.get("start")
+                            existing_league.season_end = season_info.get("end")
+                            existing_league.is_current = season_info.get("current", False)
+                        elif key == "coverage":
+                            existing_league.coverage = json.dumps(value)
+                        else:
+                            setattr(existing_league, key, value)
                 existing_league.name = league_name  # Ensure name is set
                 existing_league.updated_at = datetime.utcnow()
                 league = existing_league
@@ -129,7 +137,7 @@ class DataIngestionService:
             if 'db' in locals():
                 db.close()
     
-    async def _ingest_teams(self, league_id: int, season: int) -> Dict[str, Any]:
+    def _ingest_teams(self, league_id: int, season: int) -> Dict[str, Any]:
         """Ingest all teams for a league/season."""
         logger.info(f"Ingesting teams for league {league_id}, season {season}")
         
@@ -173,7 +181,9 @@ class DataIngestionService:
                         national=team_info.get("national", False),
                         logo=team_info.get("logo"),
                         league_id=league_id,
-                        season=season
+                        season=season,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
                     )
                     db.add(team)
                     db.flush()  # Get the team ID
@@ -221,7 +231,7 @@ class DataIngestionService:
         finally:
             db.close()
     
-    async def _ingest_players(self, league_id: int, season: int) -> Dict[str, Any]:
+    def _ingest_players(self, league_id: int, season: int) -> Dict[str, Any]:
         """Ingest all players for a league/season with pagination."""
         logger.info(f"Ingesting players for league {league_id}, season {season}")
         
@@ -310,7 +320,9 @@ class DataIngestionService:
                             dribbles_attempts=stats.get("dribbles", {}).get("attempts", 0),
                             dribbles_success=stats.get("dribbles", {}).get("success", 0),
                             fouls_drawn=stats.get("fouls", {}).get("drawn", 0),
-                            fouls_committed=stats.get("fouls", {}).get("committed", 0)
+                            fouls_committed=stats.get("fouls", {}).get("committed", 0),
+                            created_at=datetime.utcnow(),
+                            updated_at=datetime.utcnow()
                         )
                         db.add(player)
                     
@@ -320,7 +332,7 @@ class DataIngestionService:
                 
                 # Rate limiting: sleep every other page to avoid hitting limits
                 if page % 2 == 1 and page < total_pages:
-                    await asyncio.sleep(1)
+                    asyncio.sleep(1)
             
             db.commit()
             logger.info(f"Successfully ingested {len(all_players)} players")
@@ -355,11 +367,11 @@ class DataIngestionService:
             if hasattr(player, "captain"):
                 player.captain = games.get("captain", False)
             if hasattr(player, "appearances"):
-                player.appearances = games.get("appearences", 0)
+                player.appearances = games.get("appearences", 0) or 0
             if hasattr(player, "lineups"):
-                player.lineups = games.get("lineups", 0)
+                player.lineups = games.get("lineups", 0) or 0
             if hasattr(player, "minutes"):
-                player.minutes = games.get("minutes", 0)
+                player.minutes = games.get("minutes", 0) or 0
             if hasattr(player, "rating"):
                 player.rating = str(games.get("rating")) if games.get("rating") else None
         
@@ -367,18 +379,18 @@ class DataIngestionService:
         if stats.get("goals"):
             goals = stats["goals"]
             if hasattr(player, "goals"):
-                player.goals = goals.get("total", 0)
+                player.goals = goals.get("total", 0) or 0
             if hasattr(player, "assists"):
-                player.assists = goals.get("assists", 0)
+                player.assists = goals.get("assists", 0) or 0
         
         if stats.get("cards"):
             cards = stats["cards"]
             if hasattr(player, "yellow_cards"):
-                player.yellow_cards = cards.get("yellow", 0)
+                player.yellow_cards = cards.get("yellow", 0) or 0
             if hasattr(player, "red_cards"):
-                player.red_cards = cards.get("red", 0)
+                player.red_cards = cards.get("red", 0) or 0
     
-    async def _ingest_fixtures(self, league_id: int, season: int) -> Dict[str, Any]:
+    def _ingest_fixtures(self, league_id: int, season: int) -> Dict[str, Any]:
         """Ingest fixtures for a league/season."""
         logger.info(f"Ingesting fixtures for league {league_id}, season {season}")
         
@@ -436,7 +448,9 @@ class DataIngestionService:
                         score_extratime_home=score_info.get("extratime", {}).get("home"),
                         score_extratime_away=score_info.get("extratime", {}).get("away"),
                         score_penalty_home=score_info.get("penalty", {}).get("home"),
-                        score_penalty_away=score_info.get("penalty", {}).get("away")
+                        score_penalty_away=score_info.get("penalty", {}).get("away"),
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
                     )
                     db.add(fixture)
                 
@@ -491,7 +505,226 @@ class DataIngestionService:
             if hasattr(fixture, "score_fulltime_away"):
                 fixture.score_fulltime_away = fulltime.get("away")
     
-    async def get_ingestion_status(self, league_id: int, season: int) -> Dict[str, Any]:
+    def _ingest_fixture_player_stats(self, league_id: int, season: int) -> Dict[str, Any]:
+        """Ingest fixture player statistics for a league/season."""
+        logger.info(f"Ingesting fixture player statistics for league {league_id}, season {season}")
+        
+        try:
+            db = self.get_db()
+            all_player_stats = []
+            
+            # Get all fixtures for this league/season first
+            fixtures = db.query(Fixture).filter(
+                and_(Fixture.league_id == league_id, Fixture.season == season)
+            ).all()
+            
+            logger.info(f"Found {len(fixtures)} fixtures to process for player stats")
+            
+            for fixture in fixtures:
+                try:
+                    logger.info(f"Processing fixture {fixture.id} for player stats")
+                    
+                    # Get fixture player stats from API
+                    response = self.api_client.get_fixture_players(fixture.id)
+                    fixture_data = response.get("response", [])
+                    
+                    if not fixture_data:
+                        logger.info(f"No player stats found for fixture {fixture.id}")
+                        continue
+                    
+                    # Process each team's player stats
+                    for team_data in fixture_data:
+                        team_id = team_data.get("team", {}).get("id")
+                        players_data = team_data.get("players", [])
+                        
+                        logger.info(f"Processing {len(players_data)} players for team {team_id} in fixture {fixture.id}")
+                        
+                        for player_data in players_data:
+                            player_id = player_data.get("player", {}).get("id")
+                            stats = player_data.get("statistics", [{}])[0]
+                            
+                            if not player_id or not team_id:
+                                continue
+                            
+                            # Check if player stats already exist for this fixture/player/team
+                            existing_player_stat = db.query(FixturePlayerStats).filter(
+                                and_(
+                                    FixturePlayerStats.fixture_id == fixture.id,
+                                    FixturePlayerStats.player_id == player_id,
+                                    FixturePlayerStats.team_id == team_id
+                                )
+                            ).first()
+                            
+                            if existing_player_stat:
+                                # Update existing player stats
+                                self._update_fixture_player_stats(existing_player_stat, stats)
+                                existing_player_stat.updated_at = datetime.utcnow()
+                                player_stat = existing_player_stat
+                            else:
+                                # Create new player stats
+                                player_stat = FixturePlayerStats(
+                                    fixture_id=fixture.id,
+                                    player_id=player_id,
+                                    team_id=team_id,
+                                    season=season,
+                                    position=stats.get("games", {}).get("position"),
+                                    number=stats.get("games", {}).get("number"),
+                                    is_starter=stats.get("games", {}).get("substitute", False) == False,
+                                    minutes=stats.get("games", {}).get("minutes", 0),
+                                    rating=stats.get("games", {}).get("rating"),
+                                    goals=stats.get("goals", {}).get("total", 0),
+                                    assists=stats.get("goals", {}).get("assists", 0),
+                                    penalty_goals=stats.get("goals", {}).get("conceded", 0),
+                                    penalty_missed=stats.get("penalty", {}).get("missed", 0),
+                                    yellow_cards=stats.get("cards", {}).get("yellow", 0),
+                                    red_cards=stats.get("cards", {}).get("red", 0),
+                                    shots_total=stats.get("shots", {}).get("total", 0),
+                                    shots_on_target=stats.get("shots", {}).get("on", 0),
+                                    passes_total=stats.get("passes", {}).get("total", 0),
+                                    passes_accuracy=stats.get("passes", {}).get("accuracy", 0),
+                                    key_passes=stats.get("passes", {}).get("key", 0),
+                                    tackles_total=stats.get("tackles", {}).get("total", 0),
+                                    blocks_total=stats.get("tackles", {}).get("blocks", 0),
+                                    interceptions_total=stats.get("tackles", {}).get("interceptions", 0),
+                                    duels_total=stats.get("duels", {}).get("total", 0),
+                                    duels_won=stats.get("duels", {}).get("won", 0),
+                                    dribbles_attempts=stats.get("dribbles", {}).get("attempts", 0),
+                                    dribbles_success=stats.get("dribbles", {}).get("success", 0),
+                                    fouls_drawn=stats.get("fouls", {}).get("drawn", 0),
+                                    fouls_committed=stats.get("fouls", {}).get("committed", 0),
+                                    saves=stats.get("goals", {}).get("saves", 0),
+                                    goals_conceded=stats.get("goals", {}).get("conceded", 0),
+                                    clean_sheets=stats.get("goals", {}).get("conceded", 0) == 0,
+                                    created_at=datetime.utcnow(),
+                                    updated_at=datetime.utcnow()
+                                )
+                                db.add(player_stat)
+                            
+                            all_player_stats.append(player_stat.id)
+                        
+                        # Small delay to avoid rate limiting
+                        import time
+                        time.sleep(0.1)
+                    
+                except Exception as e:
+                    logger.error(f"Error processing fixture {fixture.id}: {e}")
+                    continue
+            
+            db.commit()
+            logger.info(f"Successfully ingested {len(all_player_stats)} fixture player stats")
+            
+            return {
+                "total_player_stats": len(all_player_stats),
+                "ingested_player_stats": len(all_player_stats),
+                "player_stat_ids": all_player_stats
+            }
+            
+        except Exception as e:
+            logger.error(f"Error ingesting fixture player stats: {e}")
+            db.rollback()
+            raise
+        finally:
+            db.close()
+    
+    def _update_fixture_player_stats(self, player_stat: FixturePlayerStats, stats: Dict) -> None:
+        """Update existing fixture player stats with new data."""
+        # Update basic info
+        if stats.get("games"):
+            games = stats["games"]
+            if hasattr(player_stat, "position"):
+                player_stat.position = games.get("position")
+            if hasattr(player_stat, "number"):
+                player_stat.number = games.get("number")
+            if hasattr(player_stat, "is_starter"):
+                player_stat.is_starter = games.get("substitute", False) == False
+            if hasattr(player_stat, "minutes"):
+                player_stat.minutes = games.get("minutes", 0)
+            if hasattr(player_stat, "rating"):
+                player_stat.rating = games.get("rating")
+        
+        # Update goals and assists
+        if stats.get("goals"):
+            goals = stats["goals"]
+            if hasattr(player_stat, "goals"):
+                player_stat.goals = goals.get("total", 0)
+            if hasattr(player_stat, "assists"):
+                player_stat.assists = goals.get("assists", 0)
+            if hasattr(player_stat, "penalty_goals"):
+                player_stat.penalty_goals = goals.get("conceded", 0)
+            if hasattr(player_stat, "saves"):
+                player_stat.saves = goals.get("saves", 0)
+            if hasattr(player_stat, "goals_conceded"):
+                player_stat.goals_conceded = goals.get("conceded", 0)
+            if hasattr(player_stat, "clean_sheets"):
+                player_stat.clean_sheets = goals.get("conceded", 0) == 0
+        
+        # Update cards
+        if stats.get("cards"):
+            cards = stats["cards"]
+            if hasattr(player_stat, "yellow_cards"):
+                player_stat.yellow_cards = cards.get("yellow", 0)
+            if hasattr(player_stat, "red_cards"):
+                player_stat.red_cards = cards.get("red", 0)
+        
+        # Update shots
+        if stats.get("shots"):
+            shots = stats["shots"]
+            if hasattr(player_stat, "shots_total"):
+                player_stat.shots_total = shots.get("total", 0)
+            if hasattr(player_stat, "shots_on_target"):
+                player_stat.shots_on_target = shots.get("on", 0)
+        
+        # Update passes
+        if stats.get("passes"):
+            passes = stats["passes"]
+            if hasattr(player_stat, "passes_total"):
+                player_stat.passes_total = passes.get("total", 0)
+            if hasattr(player_stat, "passes_accuracy"):
+                player_stat.passes_accuracy = passes.get("accuracy", 0)
+            if hasattr(player_stat, "key_passes"):
+                player_stat.key_passes = passes.get("key", 0)
+        
+        # Update tackles
+        if stats.get("tackles"):
+            tackles = stats["tackles"]
+            if hasattr(player_stat, "tackles_total"):
+                player_stat.tackles_total = tackles.get("total", 0)
+            if hasattr(player_stat, "blocks_total"):
+                player_stat.blocks_total = tackles.get("blocks", 0)
+            if hasattr(player_stat, "interceptions_total"):
+                player_stat.interceptions_total = tackles.get("interceptions", 0)
+        
+        # Update duels
+        if stats.get("duels"):
+            duels = stats["duels"]
+            if hasattr(player_stat, "duels_total"):
+                player_stat.duels_total = duels.get("total", 0)
+            if hasattr(player_stat, "duels_won"):
+                player_stat.duels_won = duels.get("won", 0)
+        
+        # Update dribbles
+        if stats.get("dribbles"):
+            dribbles = stats["dribbles"]
+            if hasattr(player_stat, "dribbles_attempts"):
+                player_stat.dribbles_attempts = dribbles.get("attempts", 0)
+            if hasattr(player_stat, "dribbles_success"):
+                player_stat.dribbles_success = dribbles.get("success", 0)
+        
+        # Update fouls
+        if stats.get("fouls"):
+            fouls = stats["fouls"]
+            if hasattr(player_stat, "fouls_drawn"):
+                player_stat.fouls_drawn = fouls.get("drawn", 0)
+            if hasattr(player_stat, "fouls_committed"):
+                player_stat.fouls_committed = fouls.get("committed", 0)
+        
+        # Update penalty
+        if stats.get("penalty"):
+            penalty = stats["penalty"]
+            if hasattr(player_stat, "penalty_missed"):
+                player_stat.penalty_missed = penalty.get("missed", 0)
+    
+    def get_ingestion_status(self, league_id: int, season: int) -> Dict[str, Any]:
         """Get the current ingestion status for a league/season."""
         db = self.get_db()
         

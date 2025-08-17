@@ -56,6 +56,99 @@ def list_fixtures(
         raise HTTPException(status_code=502, detail=str(e))
 
 
+@router.get("/{fixture_id}/players")
+def get_fixture_player_stats(fixture_id: int) -> Dict[str, Any]:
+    """Get player statistics for a specific fixture.
+    
+    This endpoint provides detailed statistics for each player in a fixture,
+    including goals, assists, cards, shots, passes, tackles, and other performance metrics.
+    """
+    try:
+        client = ApiClientV3()
+        data = client.get_fixture_players(fixture_id)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.get("/{fixture_id}/players/stored")
+def get_stored_fixture_player_stats(fixture_id: int) -> Dict[str, Any]:
+    """Get stored fixture player statistics from the local database.
+    
+    This endpoint returns player statistics that have been ingested and stored locally,
+    providing faster access to historical data without hitting the external API.
+    """
+    try:
+        from app.db.session import SessionLocal
+        from app.models import FixturePlayerStats
+        from sqlalchemy.orm import Session
+        
+        db: Session = SessionLocal()
+        
+        # Get all player stats for this fixture
+        player_stats = db.query(FixturePlayerStats).filter(
+            FixturePlayerStats.fixture_id == fixture_id
+        ).all()
+        
+        if not player_stats:
+            return {
+                "fixture_id": fixture_id,
+                "message": "No player statistics found for this fixture",
+                "player_stats": []
+            }
+        
+        # Group by team
+        team_stats = {}
+        for stat in player_stats:
+            team_id = stat.team_id
+            if team_id not in team_stats:
+                team_stats[team_id] = []
+            
+            team_stats[team_id].append({
+                "player_id": stat.player_id,
+                "position": stat.position,
+                "number": stat.number,
+                "is_starter": stat.is_starter,
+                "minutes": stat.minutes,
+                "rating": stat.rating,
+                "goals": stat.goals,
+                "assists": stat.assists,
+                "penalty_goals": stat.penalty_goals,
+                "penalty_missed": stat.penalty_missed,
+                "yellow_cards": stat.yellow_cards,
+                "red_cards": stat.red_cards,
+                "shots_total": stat.shots_total,
+                "shots_on_target": stat.shots_on_target,
+                "passes_total": stat.passes_total,
+                "passes_accuracy": stat.passes_accuracy,
+                "key_passes": stat.key_passes,
+                "tackles_total": stat.tackles_total,
+                "blocks_total": stat.blocks_total,
+                "interceptions_total": stat.interceptions_total,
+                "duels_total": stat.duels_total,
+                "duels_won": stat.duels_won,
+                "dribbles_attempts": stat.dribbles_attempts,
+                "dribbles_success": stat.dribbles_success,
+                "fouls_drawn": stat.fouls_drawn,
+                "fouls_committed": stat.fouls_committed,
+                "saves": stat.saves,
+                "goals_conceded": stat.goals_conceded,
+                "clean_sheets": stat.clean_sheets
+            })
+        
+        return {
+            "fixture_id": fixture_id,
+            "total_players": len(player_stats),
+            "teams": team_stats
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    finally:
+        if 'db' in locals():
+            db.close()
+
+
 @router.get("/live")
 def get_live_fixtures(
     league: int | None = Query(None, description="League ID to filter live fixtures"),
