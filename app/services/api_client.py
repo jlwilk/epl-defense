@@ -59,39 +59,41 @@ class ApiClientV3:
         Returns:
             Dictionary containing player statistics for the season
         """
-        params = {"player": player_id, "season": season}
+        params = {"id": player_id, "season": season}
         if league:
             params["league"] = league
         return self.get("/players", params=params)
 
-    def get_player_statistics_by_league(self, league: int, season: int, team: int | None = None) -> Dict[str, Any]:
+    def get_player_statistics_by_league(self, league: int, season: int, team: int | None = None, page: int = 1) -> Dict[str, Any]:
         """Get player statistics for a league and season, optionally filtered by team.
         
         Args:
             league: The league ID
             season: The season year
             team: Optional team ID to filter by
+            page: Page number for pagination (default: 1)
             
         Returns:
             Dictionary containing player statistics for the league/season
         """
-        params = {"league": league, "season": season}
+        params = {"league": league, "season": season, "page": page}
         if team:
             params["team"] = team
         return self.get("/players", params=params)
 
-    def get_player_statistics_by_team(self, team: int, season: int, league: int | None = None) -> Dict[str, Any]:
+    def get_player_statistics_by_team(self, team: int, season: int, league: int | None = None, page: int = 1) -> Dict[str, Any]:
         """Get player statistics for a specific team and season.
         
         Args:
             team: The team ID
             season: The season year
             league: Optional league ID to filter by
+            page: Page number for pagination (default: 1)
             
         Returns:
             Dictionary containing player statistics for the team
         """
-        params = {"team": team, "season": season}
+        params = {"team": team, "season": season, "page": page}
         if league:
             params["league"] = league
         return self.get("/players", params=params)
@@ -132,5 +134,31 @@ class ApiClientV3:
         if season:
             params["season"] = season
         return self.get("/players", params=params)
+
+    def get_top_scorers(self, league: int, season: int, limit: int = 10) -> Dict[str, Any]:
+        """Get top goal scorers for a league/season.
+        
+        Args:
+            league: The league ID
+            season: The season year
+            limit: Number of top scorers to return
+            
+        Returns:
+            Dictionary containing top goal scorers
+        """
+        return self.get("/players/topscorers", params={"league": league, "season": season})
+
+    def get_top_assists(self, league: int, season: int, limit: int = 10) -> Dict[str, Any]:
+        """Get top assist providers for a league/season.
+        
+        Args:
+            league: The league ID
+            season: The season year
+            limit: Number of top assist providers to return
+            
+        Returns:
+            Dictionary containing top assist providers
+        """
+        return self.get("/players/topassists", params={"league": league, "season": season})
 
 

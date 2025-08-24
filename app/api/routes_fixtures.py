@@ -1,18 +1,173 @@
 from __future__ import annotations
 
 from typing import Any, Dict
-
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Path, Depends
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.services.api_client import ApiClientV3
+from app.schemas import ApiResponse, FixtureResponse
+from app.db.session import get_db
 
 router = APIRouter(prefix="/fixtures", tags=["fixtures"])
 
 
-@router.get("/")
+@router.get(
+    "/",
+    summary="List Fixtures",
+    description="Get fixtures with comprehensive filtering options including season, league, team, date range, and status. Returns detailed fixture information with teams, goals, scores, and venue details.",
+    response_model=ApiResponse,
+    responses={
+        200: {
+            "description": "Successful response with fixtures data",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "get": "fixtures",
+                        "parameters": {"league": "39", "season": "2025", "team": "40"},
+                        "errors": None,
+                        "results": 38,
+                        "paging": {"current": 1, "total": 2},
+                        "response": [
+                            {
+                                "id": 1035037,
+                                "referee": "Michael Oliver",
+                                "timezone": "UTC",
+                                "date": "2025-08-16",
+                                "timestamp": 1734393600,
+                                "periods": {"first": 1734397200, "second": 1734400800},
+                                "venue": {
+                                    "id": 550,
+                                    "name": "Anfield",
+                                    "city": "Liverpool"
+                                },
+                                "status": {"long": "Match Finished", "short": "FT", "elapsed": 90},
+                                "league": {
+                                    "id": 39,
+                                    "name": "Premier League",
+                                    "country": "England",
+                                    "logo": "https://media.api-sports.io/football/leagues/39.png",
+                                    "flag": "https://media.api-sports.io/flags/gb.svg",
+                                    "season": 2025,
+                                    "round": "Regular Season - 1"
+                                },
+                                "teams": {
+                                    "home": {
+                                        "id": 40,
+                                        "name": "Liverpool",
+                                        "logo": "https://media.api-sports.io/football/teams/40.png",
+                                        "winner": True
+                                    },
+                                    "away": {
+                                        "id": 47,
+                                        "name": "Tottenham",
+                                        "logo": "https://media.api-sports.io/football/teams/47.png",
+                                        "winner": False
+                                    }
+                                },
+                                "goals": {
+                                    "home": 3,
+                                    "away": 1
+                                },
+                                "score": {
+                                    "halftime": {"home": 2, "away": 0},
+                                    "fulltime": {"home": 3, "away": 1},
+                                    "extratime": {"home": None, "away": None},
+                                    "penalty": {"home": None, "away": None}
+                                }
+                            },
+                            {
+                                "id": 1035038,
+                                "referee": "Anthony Taylor",
+                                "timezone": "UTC",
+                                "date": "2025-08-23",
+                                "timestamp": 1735008000,
+                                "periods": {"first": 1735011600, "second": 1735015200},
+                                "venue": {
+                                    "id": 556,
+                                    "name": "Old Trafford",
+                                    "city": "Manchester"
+                                },
+                                "status": {"long": "Not Started", "short": "NS", "elapsed": None},
+                                "league": {
+                                    "id": 39,
+                                    "name": "Premier League",
+                                    "country": "England",
+                                    "logo": "https://media.api-sports.io/football/leagues/39.png",
+                                    "flag": "https://media.api-sports.io/flags/gb.svg",
+                                    "season": 2025,
+                                    "round": "Regular Season - 2"
+                                },
+                                "teams": {
+                                    "home": {
+                                        "id": 33,
+                                        "name": "Manchester United",
+                                        "logo": "https://media.api-sports.io/football/teams/33.png",
+                                        "winner": None
+                                    },
+                                    "away": {
+                                        "id": 50,
+                                        "name": "Manchester City",
+                                        "logo": "https://media.api-sports.io/football/teams/50.png",
+                                        "winner": None
+                                    }
+                                },
+                                "goals": {
+                                    "home": None,
+                                    "away": None
+                                },
+                                "score": {
+                                    "halftime": {"home": None, "away": None},
+                                    "fulltime": {"home": None, "away": None},
+                                    "extratime": {"home": None, "away": None},
+                                    "penalty": {"home": None, "away": None}
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Bad request - invalid parameters",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid date format or parameter combination"
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Validation error - invalid parameter types",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": [
+                            {
+                                "loc": ["query", "season"],
+                                "msg": "value is not a valid integer",
+                                "type": "type_error.integer"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        502: {
+            "description": "Bad gateway - external API error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "External API service unavailable"
+                    }
+                }
+            }
+        }
+    }
+)
 def list_fixtures(
-    season: int = Query(None, description="Season year (defaults to 2025)"),
+    season: int | None = Query(None, description="Season year (defaults to 2025)"),
     league: int | None = Query(None, description="League id; defaults to settings.LEAGUE_ID"),
     team: int | None = Query(None, description="Team ID to filter fixtures"),
     last: int | None = Query(None, description="Return last N fixtures"),
@@ -21,16 +176,21 @@ def list_fixtures(
     to_date: str | None = Query(None, description="To date (YYYY-MM-DD)"),
     round: str | None = Query(None, description="Round of the season"),
     status: str | None = Query(None, description="Fixture status (TBD, NS, 1H, HT, 2H, FT, AET, PEN, BT, SUSP, INT, PST, CANC, ABD, AWD, WO)"),
-) -> Dict[str, Any]:
+    db: Session = Depends(get_db),
+) -> ApiResponse:
     """Get fixtures with comprehensive filtering options."""
     settings = get_settings()
-    league_id = league or settings.league_id_default
-    season_id = season or settings.season_default
+    
+    # Use defaults if not provided
+    if season is None:
+        season = settings.season_default
+    if league is None:
+        league = settings.league_id_default
     
     # API requires at least one parameter, so we'll always include season and league
     params: Dict[str, Any] = {
-        "season": season_id,
-        "league": league_id
+        "season": season,
+        "league": league
     }
     
     if team:
@@ -51,6 +211,15 @@ def list_fixtures(
     try:
         client = ApiClientV3()
         data = client.get("/fixtures", params=params)
+        
+        # Ensure errors field is None (not empty list) to match ApiResponse schema
+        if data.get("errors") == []:
+            data["errors"] = None
+        
+        # Ensure paging field is None if it's an empty dict or empty list
+        if data.get("paging") in [{}, []]:
+            data["paging"] = None
+        
         return data
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
@@ -149,10 +318,81 @@ def get_stored_fixture_player_stats(fixture_id: int) -> Dict[str, Any]:
             db.close()
 
 
-@router.get("/live")
+@router.get(
+    "/live",
+    summary="Get Live Fixtures",
+    description="Get all currently live fixtures.",
+    response_model=ApiResponse,
+    responses={
+        200: {
+            "description": "Successful response with live fixtures data",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "get": "fixtures",
+                        "parameters": {"league": "39", "season": "2025"},
+                        "errors": None,
+                        "results": 2,
+                        "paging": None,
+                        "response": [
+                            {
+                                "id": 1035038,
+                                "referee": "Anthony Taylor",
+                                "timezone": "UTC",
+                                "date": "2025-08-17",
+                                "timestamp": 1734480000,
+                                "periods": {"first": 1734483600, "second": 1734487200},
+                                "venue": {
+                                    "id": 556,
+                                    "name": "Old Trafford",
+                                    "city": "Manchester"
+                                },
+                                "status": {"long": "First Half", "short": "1H", "elapsed": 35},
+                                "league": {
+                                    "id": 39,
+                                    "name": "Premier League",
+                                    "country": "England",
+                                    "logo": "https://media.api-sports.io/football/leagues/39.png",
+                                    "flag": "https://media.api-sports.io/flags/gb.svg",
+                                    "season": 2025,
+                                    "round": "Regular Season - 1"
+                                },
+                                "teams": {
+                                    "home": {
+                                        "id": 33,
+                                        "name": "Manchester United",
+                                        "logo": "https://media.api-sports.io/football/teams/33.png",
+                                        "winner": None
+                                    },
+                                    "away": {
+                                        "id": 34,
+                                        "name": "Newcastle",
+                                        "logo": "https://media.api-sports.io/football/teams/34.png",
+                                        "winner": None
+                                    }
+                                },
+                                "goals": {
+                                    "home": 1,
+                                    "away": 0
+                                },
+                                "score": {
+                                    "halftime": {"home": None, "away": None},
+                                    "fulltime": {"home": None, "away": None},
+                                    "extratime": {"home": None, "away": None},
+                                    "penalty": {"home": None, "away": None}
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+)
 def get_live_fixtures(
     league: int | None = Query(None, description="League ID to filter live fixtures"),
-) -> Dict[str, Any]:
+    db: Session = Depends(get_db),
+) -> ApiResponse:
     """Get all currently live fixtures."""
     try:
         client = ApiClientV3()
@@ -174,6 +414,14 @@ def get_live_fixtures(
             ]
             data["response"] = live_fixtures
             data["results"] = len(live_fixtures)
+        
+        # Ensure errors field is None (not empty list) to match ApiResponse schema
+        if data.get("errors") == []:
+            data["errors"] = None
+        
+        # Ensure paging field is None if it's an empty dict or empty list
+        if data.get("paging") in [{}, []]:
+            data["paging"] = None
         
         return data
     except Exception as e:
@@ -334,6 +582,89 @@ def get_team_form(
         return form_analysis
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.get(
+    "/team/{team_id}",
+    summary="Get Team Fixtures",
+    description="Get all fixtures for a specific team.",
+    response_model=ApiResponse,
+    responses={
+        200: {
+            "description": "Successful response with team fixtures",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "get": "fixtures",
+                        "parameters": {"team": "33"},
+                        "errors": None,
+                        "results": 38,
+                        "paging": None,
+                        "response": [
+                            {
+                                "id": 1035037,
+                                "referee": "Michael Oliver",
+                                "timezone": "UTC",
+                                "date": "2025-08-16",
+                                "timestamp": 1734393600,
+                                "status": {"long": "Match Finished", "short": "FT", "elapsed": 90},
+                                "teams": {
+                                    "home": {
+                                        "id": 33,
+                                        "name": "Manchester United",
+                                        "logo": "https://media.api-sports.io/football/teams/33.png"
+                                    },
+                                    "away": {
+                                        "id": 40,
+                                        "name": "Liverpool",
+                                        "logo": "https://media.api-sports.io/football/teams/40.png"
+                                    }
+                                },
+                                "goals": {
+                                    "home": 1,
+                                    "away": 2
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+)
+def get_team_fixtures(
+    team_id: int = Path(..., description="Team ID"),
+    season: int | None = Query(None, description="Season year (defaults to 2025)"),
+    league: int | None = Query(None, description="League id; defaults to settings.LEAGUE_ID"),
+    db: Session = Depends(get_db),
+) -> ApiResponse:
+    """Get all fixtures for a specific team."""
+    settings = get_settings()
+    api_client = ApiClientV3()
+    
+    # Use defaults if not provided
+    if season is None:
+        season = settings.season_default
+    if league is None:
+        league = settings.league_id_default
+    
+    params = {"team": team_id}
+    if season:
+        params["season"] = season
+    if league:
+        params["league"] = league
+    
+    response = api_client.get("fixtures", params=params)
+    
+    # Ensure errors field is None (not empty list) to match ApiResponse schema
+    if response.get("errors") == []:
+        response["errors"] = None
+    
+    # Ensure paging field is None if it's an empty dict or empty list
+    if response.get("paging") in [{}, []]:
+        response["paging"] = None
+    
+    return response
 
 
 # Dynamic routes must come after specific paths

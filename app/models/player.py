@@ -48,8 +48,8 @@ class Player(Base):
     dribbles_success: Mapped[int] = mapped_column(Integer, default=0)
     fouls_drawn: Mapped[int] = mapped_column(Integer, default=0)
     fouls_committed: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
     
     # Relationships
     team = relationship("Team", back_populates="players")

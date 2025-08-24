@@ -189,6 +189,20 @@ INGESTION_BATCH_SIZE=100
 INGESTION_RATE_LIMIT_DELAY=1.0
 ```
 
+## 📚 Documentation
+
+### 📖 Available Documentation
+
+- **[API Endpoint Reference](docs/API_ENDPOINT_REFERENCE.md)** - Complete endpoint reference with examples
+- **[API Response Format](docs/API_RESPONSE_FORMAT.md)** - Standardized response structure documentation
+- **[Development Guide](docs/DEVELOPMENT_GUIDE.md)** - Comprehensive development and contribution guide
+
+### 📚 Interactive API Documentation
+
+- **Swagger UI**: `http://127.0.0.1:8001/docs` - Interactive API explorer
+- **ReDoc**: `http://127.0.0.1:8001/redoc` - Alternative documentation view
+- **OpenAPI JSON**: `http://127.0.0.1:8001/openapi.json` - Raw OpenAPI specification
+
 ## 🏃‍♂️ Development
 
 ### Project Structure
