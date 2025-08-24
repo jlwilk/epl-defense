@@ -135,7 +135,7 @@ clean-all: clean clean-venv ## Clean everything including virtual environment
 # Development Utilities
 shell: ## Open Python shell with app context
 	@echo "🐍 Opening Python shell..."
-	python -c "from app.main import app; print('App loaded successfully')"
+	python3 -c "from app.main import app; print('App loaded successfully')"
 
 check: ## Run all checks (lint, format-check, test)
 	@echo "🔍 Running all checks..."
@@ -181,7 +181,7 @@ dev-setup: setup-dev install-deps database ## Complete development setup
 status: ## Show project status
 	@echo "📊 EPL Defense API - Project Status"
 	@echo "=================================="
-	@echo "Python version: $(shell python --version)"
+	@echo "Python version: $(shell python3 --version)"
 	@echo "Virtual env: $(shell if [ -d ".venv" ]; then echo "✅ Active"; else echo "❌ Not found"; fi)"
 	@echo "Database: $(shell if [ -f "epl_defense.db" ]; then echo "✅ Found"; else echo "❌ Not found"; fi)"
 	@echo "Dependencies: $(shell if [ -d ".venv" ]; then echo "✅ Installed"; else echo "❌ Not installed"; fi)"
@@ -189,12 +189,12 @@ status: ## Show project status
 # Player Data Sync
 sync-league: ## Sync all players for a league (usage: make sync-league LEAGUE=39 SEASON=2025)
 	@echo "🔄 Syncing players for league $(LEAGUE), season $(SEASON)..."
-	@python scripts/sync_players.py --league $(LEAGUE) --season $(SEASON)
+	@python3 scripts/sync_players.py --league $(LEAGUE) --season $(SEASON)
 
 sync-team: ## Sync all players for a team (usage: make sync-team TEAM=40 SEASON=2025)
 	@echo "🔄 Syncing players for team $(TEAM), season $(SEASON)..."
-	@python scripts/sync_players.py --team $(TEAM) --season $(SEASON)
+	@python3 scripts/sync_players.py --team $(TEAM) --season $(SEASON)
 
 sync-premier-league: ## Sync Premier League players for current season
 	@echo "🔄 Syncing Premier League players..."
-	@python scripts/sync_players.py --league 39 --season 2025
+	@python3 scripts/sync_players.py --league 39 --season 2025
