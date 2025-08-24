@@ -1,4 +1,0 @@
-[console_scripts]
-epl = epl_defense.cli:main
-epl-api = epl_defense.server:run
-epl-fastapi = app.main:run
