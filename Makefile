@@ -12,25 +12,25 @@ help: ## Show this help message
 # Development Setup
 setup-dev: ## Set up development environment
 	@echo "🚀 Setting up development environment..."
-	python -m venv .venv
-	.venv/bin/pip install --upgrade pip
-	.venv/bin/pip install -e .
-	.venv/bin/pip install -e ".[dev]"
+	python3 -m venv .venv
+	.venv/bin/pip3.13 install --upgrade pip
+	.venv/bin/pip3.13 install -e .
+	.venv/bin/pip3.13 install -e ".[dev]"
 	@echo "✅ Development environment ready!"
 
 install: ## Install production dependencies
 	@echo "📦 Installing production dependencies..."
-	pip install -e .
+	.venv/bin/pip3.13 install -e .
 
 install-dev: ## Install development dependencies
 	@echo "🔧 Installing development dependencies..."
-	pip install -e ".[dev]"
+	.venv/bin/pip3.13 install -e ".[dev]"
 
 install-deps: install-dev ## Alias for install-dev
 
 update-deps: ## Update all dependencies to latest versions
 	@echo "🔄 Updating dependencies..."
-	pip install --upgrade -e ".[dev]"
+	.venv/bin/pip3.13 install --upgrade -e ".[dev]"
 
 clean-venv: ## Remove virtual environment
 	@echo "🧹 Cleaning virtual environment..."
@@ -40,27 +40,27 @@ clean-venv: ## Remove virtual environment
 # Testing
 test: ## Run all tests
 	@echo "🧪 Running all tests..."
-	python -m pytest tests/ -v
+	.venv/bin/python3.13 -m pytest tests/ -v
 
 test-unit: ## Run unit tests only
 	@echo "🧪 Running unit tests..."
-	python -m pytest tests/ -v -m "not integration"
+	.venv/bin/python3.13 -m pytest tests/ -v -m "not integration"
 
 test-integration: ## Run integration tests only
 	@echo "🧪 Running integration tests..."
-	python -m pytest tests/ -v -m "integration"
+	.venv/bin/python3.13 -m pytest tests/ -v -m "integration"
 
 test-coverage: ## Run tests with coverage report
 	@echo "🧪 Running tests with coverage..."
-	python -m pytest tests/ --cov=app --cov-report=term-missing --cov-report=html
+	.venv/bin/python3.13 -m pytest tests/ --cov=app --cov-report=term-missing --cov-report=html
 
 test-fast: ## Run fast tests (skip slow ones)
 	@echo "🧪 Running fast tests..."
-	python -m pytest tests/ -v -m "not slow"
+	.venv/bin/python3.13 -m pytest tests/ -v -m "not slow"
 
 test-watch: ## Run tests in watch mode
 	@echo "🧪 Running tests in watch mode..."
-	python -m pytest tests/ -v --watch
+	.venv/bin/python3.13 -m pytest tests/ -v --watch
 
 # Code Quality
 lint: ## Run linting checks
@@ -81,7 +81,7 @@ format-check: ## Check code formatting without making changes
 # Database
 database: ## Initialize database
 	@echo "🗄️ Initializing database..."
-	python init_database.py
+	.venv/bin/python3.13 init_database.py
 
 migrate: ## Run database migrations
 	@echo "🔄 Running database migrations..."
@@ -135,7 +135,7 @@ clean-all: clean clean-venv ## Clean everything including virtual environment
 # Development Utilities
 shell: ## Open Python shell with app context
 	@echo "🐍 Opening Python shell..."
-	python3 -c "from app.main import app; print('App loaded successfully')"
+	.venv/bin/python3.13 -c "from app.main import app; print('App loaded successfully')"
 
 check: ## Run all checks (lint, format-check, test)
 	@echo "🔍 Running all checks..."
@@ -181,7 +181,7 @@ dev-setup: setup-dev install-deps database ## Complete development setup
 status: ## Show project status
 	@echo "📊 EPL Defense API - Project Status"
 	@echo "=================================="
-	@echo "Python version: $(shell python3 --version)"
+	@echo "Python version: $(shell .venv/bin/python3.13 --version)"
 	@echo "Virtual env: $(shell if [ -d ".venv" ]; then echo "✅ Active"; else echo "❌ Not found"; fi)"
 	@echo "Database: $(shell if [ -f "epl_defense.db" ]; then echo "✅ Found"; else echo "❌ Not found"; fi)"
 	@echo "Dependencies: $(shell if [ -d ".venv" ]; then echo "✅ Installed"; else echo "❌ Not installed"; fi)"
@@ -189,12 +189,12 @@ status: ## Show project status
 # Player Data Sync
 sync-league: ## Sync all players for a league (usage: make sync-league LEAGUE=39 SEASON=2025)
 	@echo "🔄 Syncing players for league $(LEAGUE), season $(SEASON)..."
-	@python3 scripts/sync_players.py --league $(LEAGUE) --season $(SEASON)
+	@.venv/bin/python3.13 scripts/sync_players.py --league $(LEAGUE) --season $(SEASON)
 
 sync-team: ## Sync all players for a team (usage: make sync-team TEAM=40 SEASON=2025)
 	@echo "🔄 Syncing players for team $(TEAM), season $(SEASON)..."
-	@python3 scripts/sync_players.py --team $(TEAM) --season $(SEASON)
+	@.venv/bin/python3.13 scripts/sync_players.py --team $(TEAM) --season $(SEASON)
 
 sync-premier-league: ## Sync Premier League players for current season
 	@echo "🔄 Syncing Premier League players..."
-	@python3 scripts/sync_players.py --league 39 --season 2025
+	@.venv/bin/python3.13 scripts/sync_players.py --league 39 --season 2025
